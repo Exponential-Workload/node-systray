@@ -10,3 +10,7 @@ node_modules
 .editorconfig
 .gitignore
 test-dist
+.parcel-cache
+.vscode
+test-icons/
+/test.ts

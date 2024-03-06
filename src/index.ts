@@ -1,18 +1,16 @@
 import * as child from 'child_process'
-import * as path from 'path'
-import * as os from 'os'
-import * as fs from 'fs-extra'
 import * as EventEmitter from 'events'
 import * as readline from 'readline'
 import Debug from 'debug'
+import * as systrayBin from 'systray-bin'
+import { Readable } from 'stream'
 
-const pkg = require('../package.json')
-const debug = Debug(pkg.name)
+const debug = Debug(`@3xpo/systray`)
 
 export type MenuItem = {
   title: string,
   tooltip: string,
-  checked: boolean,
+  checked?: boolean | null | undefined,
   enabled: boolean,
 }
 
@@ -58,46 +56,81 @@ export type Action = UpdateItemAction | UpdateMenuAction | UpdateMenuAndItemActi
 
 export type Conf = {
   menu: Menu,
+  /** @deprecated Unused */
   debug?: boolean,
+  /** @deprecated Assuming {@link SysTray.install} or {@link systrayBin.install} are called & awaited BEFORE you perform any actions, this always happens */
   copyDir?: boolean | string
 }
 
-const getTrayBinPath = (debug: boolean = false, copyDir: boolean | string = false) => {
-  const binName = ({
-    win32: `tray_windows${debug ? '' : '_release'}.exe`,
-    darwin: `tray_darwin${debug ? '' : '_release'}`,
-    linux: `tray_linux${debug ? '' : '_release'}`,
-  })[process.platform]
-  const binPath = path.resolve(`${__dirname}/../traybin/${binName}`)
-  if (copyDir) {
-    copyDir = path.join((
-      typeof copyDir === 'string'
-        ? copyDir
-        : `${os.homedir()}/.cache/node-systray/`), pkg.version)
-
-    const copyDistPath = path.join(copyDir, binName)
-    if (!fs.existsSync(copyDistPath)) {
-      fs.ensureDirSync(copyDir)
-      fs.copySync(binPath, copyDistPath)
-    }
-
-    return copyDistPath
-  }
-  return binPath
+const getTrayBinPath = () => {
+  return systrayBin.install(false)
 }
-const CHECK_STR = ' (√)'
+const CHECK_STR = ' 🮱'
+const NOT_CHECK_STR = ' 🅇'
 function updateCheckedInLinux(item: MenuItem) {
   if (process.platform !== 'linux') {
     return item
   }
-  if (item.checked) {
+  item.title = (item.title ?? '').replace(CHECK_STR, '').replace(NOT_CHECK_STR, '')
+  if (item.checked)
     item.title += CHECK_STR
-  } else {
-    item.title = (item.title || '').replace(RegExp(CHECK_STR + '$'), '')
-  }
+  else if (typeof item.checked === 'boolean')
+    item.title += NOT_CHECK_STR
   return item
 }
 
+/**
+ * Call (& await) {@link SysTray.install} before doing anything! This ensures the executable actually exists.
+ * @example ```ts
+ * import * as fs from 'fs';
+ * import Systray from '@3xpo/systray';
+ * (async()=>{
+ *   await Systray.install()
+ *   const systray = new Systray({
+ *     menu: {
+ *       // use .png icon on posix & .ico on windows
+ *       icon: fs.readFileSync(`${__dirname}/test-icons/icon.${process.platform === 'win32' ? 'ico' : 'png'}`).toString('base64'),
+ *       title: "Test",
+ *       tooltip: "Tips",
+ *       items: [{
+ *         title: "checkable",
+ *         tooltip: "This can be checked & unchecked",
+ *         checked: true,
+ *         enabled: true
+ *       }, {
+ *         title: "thing",
+ *         tooltip: "Click this to log stuff",
+ *         enabled: true
+ *       }, {
+ *         title: "Exit",
+ *         tooltip: "Quits the application",
+ *         enabled: true
+ *       }]
+ *     },
+ *   })
+ *   
+ *   systray.onClick(action => {
+ *     if (action.seq_id === 0) {
+ *       console.log('action', action)
+ *       systray.sendAction({
+ *         type: 'update-item',
+ *         item: {
+ *           ...action.item,
+ *           checked: !action.item.checked,
+ *         },
+ *         seq_id: action.seq_id,
+ *       })
+ *     } else if (action.seq_id === 1) {
+ *       // open the url
+ *       console.log('open the url', action)
+ *     } else if (action.seq_id === 2) {
+ *       systray.kill()
+ *       process.exit()
+ *     }
+ *   })
+ * })()
+ * ```
+ */
 export default class SysTray extends EventEmitter {
   protected _conf: Conf
   protected _process: child.ChildProcess
@@ -107,19 +140,28 @@ export default class SysTray extends EventEmitter {
   constructor(conf: Conf) {
     super()
     this._conf = conf
-    this._binPath = getTrayBinPath(conf.debug, conf.copyDir)
+    this._binPath = systrayBin.filepath
     this._process = child.spawn(this._binPath, [], {
       windowsHide: true
     })
     this._rl = readline.createInterface({
-      input: this._process.stdout,
+      input: this._process.stdout as unknown as Readable,
     })
     conf.menu.items = conf.menu.items.map(updateCheckedInLinux)
     this._rl.on('line', data => debug('onLine', data))
     this.onReady(() => this.writeLine(JSON.stringify(conf.menu)))
   }
 
-  onReady(listener: () => void) {
+  /** Call this (& await it) before doing anything! This ensures the executable actually exists */
+  static async install() {
+    await systrayBin.install(false)
+  }
+  /** Call this (& await it) before doing anything! This ensures the executable actually exists */
+  async install() {
+    this._binPath = await getTrayBinPath()
+  }
+
+  onReady(listener: (...empty: void[]) => void) {
     this._rl.on('line', (line: string) => {
       let action: Event = JSON.parse(line)
       if (action.type === 'ready') {
@@ -144,7 +186,7 @@ export default class SysTray extends EventEmitter {
   writeLine(line: string) {
     if (line) {
       debug('writeLine', line + '\n', '=====')
-      this._process.stdin.write(line.trim() + '\n')
+      this._process.stdin?.write(line.trim() + '\n')
     }
     return this
   }

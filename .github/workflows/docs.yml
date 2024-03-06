@@ -1,0 +1,78 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x] # only have 1 verison here!
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install
+      run: |
+        npm install
+    - name: Build
+      run: |
+        npm run build
+    - name: Generate Docs
+      run: |
+        npm run gendoc
+
+    - name: Upload Build
+      uses: actions/upload-artifact@v2
+      with:
+        name: build
+        path: lib
+    - name: Upload Docs
+      uses: actions/upload-artifact@v2
+      with:
+        name: docs
+        path: docs
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Docs
+        uses: actions/download-artifact@v2
+        with:
+          name: docs
+      - name: Download Build
+        uses: actions/download-artifact@v2
+        with:
+          name: build
+          path: lib
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          # Upload entire repository
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2

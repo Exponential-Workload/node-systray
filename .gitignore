@@ -38,3 +38,7 @@ jspm_packages
 lib
 es
 test-dist
+
+# Docs
+docs
+.parcel-cache
