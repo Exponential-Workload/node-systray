@@ -41,6 +41,7 @@
     "@3xpo/pkgmetatool": "^0.1.6",
     "@types/debug": "^4.1.12",
     "@types/node": "^20.11.30",
+    "concurrently": "^8.2.2",
     "debug": "^4.3.4",
     "esbuild": "^0.20.2",
     "ts-node": "^10.9.2",
