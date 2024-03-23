@@ -1,83 +1,83 @@
-import * as child from 'child_process'
-import * as EventEmitter from 'events'
-import * as readline from 'readline'
-import Debug from 'debug'
-import * as systrayBin from 'systray-bin'
-import { Readable } from 'stream'
+import * as child from 'child_process';
+import * as readline from 'readline';
+import Debug from 'debug';
+import * as systrayBin from 'systray-bin';
+import { Readable } from 'stream';
 
-const debug = Debug(`@3xpo/systray`)
+const debug = Debug(`@3xpo/systray`);
 
 export type MenuItem = {
-  title: string,
-  tooltip: string,
-  checked?: boolean | null | undefined,
-  enabled: boolean,
-}
+  title: string;
+  tooltip: string;
+  checked?: boolean | null | undefined;
+  enabled: boolean;
+};
 
 export type Menu = {
-  icon: string,
-  title: string,
-  tooltip: string,
-  items: MenuItem[],
-}
+  icon: string;
+  title: string;
+  tooltip: string;
+  items: MenuItem[];
+};
 
 export type ClickEvent = {
-  type: 'clicked',
-  item: MenuItem,
-  seq_id: number,
-}
+  type: 'clicked';
+  item: MenuItem;
+  seq_id: number;
+};
 
 export type ReadyEvent = {
-  type: 'ready',
-}
+  type: 'ready';
+};
 
-export type Event = ClickEvent | ReadyEvent
+export type Event = ClickEvent | ReadyEvent;
 
 export type UpdateItemAction = {
-  type: 'update-item',
-  item: MenuItem,
-  seq_id: number,
-}
+  type: 'update-item';
+  item: MenuItem;
+  seq_id: number;
+};
 
 export type UpdateMenuAction = {
-  type: 'update-menu',
-  menu: Menu,
-  seq_id: number,
-}
+  type: 'update-menu';
+  menu: Menu;
+  seq_id: number;
+};
 
 export type UpdateMenuAndItemAction = {
-  type: 'update-menu-and-item',
-  menu: Menu,
-  item: MenuItem,
-  seq_id: number,
-}
+  type: 'update-menu-and-item';
+  menu: Menu;
+  item: MenuItem;
+  seq_id: number;
+};
 
-export type Action = UpdateItemAction | UpdateMenuAction | UpdateMenuAndItemAction
+export type Action =
+  | UpdateItemAction
+  | UpdateMenuAction
+  | UpdateMenuAndItemAction;
 
 export type Conf = {
-  menu: Menu,
+  menu: Menu;
   /** @deprecated Unused */
-  debug?: boolean,
+  debug?: boolean;
   /** @deprecated Assuming {@link SysTray.install} or {@link systrayBin.install} are called & awaited BEFORE you perform any actions, this always happens */
-  copyDir?: boolean | string
-}
+  copyDir?: boolean | string;
+};
 
-const getTrayBinPath = () => {
-  return systrayBin.install(false)
-}
-const CHECK_STR = ' 🮱'
-const NOT_CHECK_STR = ' 🅇'
-function updateCheckedInLinux(item: MenuItem) {
+const getTrayBinPath = () => systrayBin.install(false);
+const CHECK_STR = ' 🮱';
+const NOT_CHECK_STR = ' 🅇';
+const updateCheckedInLinux = (item: MenuItem) => {
   if (process.platform !== 'linux') {
-    return item
+    return item;
   }
-  item.title = (item.title ?? '').replace(CHECK_STR, '').replace(NOT_CHECK_STR, '')
-  if (item.checked)
-    item.title += CHECK_STR
-  else if (typeof item.checked === 'boolean')
-    item.title += NOT_CHECK_STR
-  return item
-}
+  item.title = (item.title ?? '')
+    .replace(CHECK_STR, '')
+    .replace(NOT_CHECK_STR, '');
+  if (item.checked) item.title += CHECK_STR;
+  else if (typeof item.checked === 'boolean') item.title += NOT_CHECK_STR;
+  return item;
+};
 
 /**
  * Call (& await) {@link SysTray.install} before doing anything! This ensures the executable actually exists.
@@ -108,7 +108,7 @@ function updateCheckedInLinux(item: MenuItem) {
  *       }]
  *     },
  *   })
- *   
+ *
  *   systray.onClick(action => {
  *     if (action.seq_id === 0) {
  *       console.log('action', action)
@@ -131,82 +131,81 @@ function updateCheckedInLinux(item: MenuItem) {
  * })()
  * ```
  */
-export default class SysTray extends EventEmitter {
-  protected _conf: Conf
-  protected _process: child.ChildProcess
-  protected _rl: readline.ReadLine
-  protected _binPath: string
+export default class SysTray {
+  protected _conf: Conf;
+  protected _process: child.ChildProcess;
+  protected _rl: readline.ReadLine;
+  protected _binPath: string;
 
   constructor(conf: Conf) {
-    super()
-    this._conf = conf
-    this._binPath = systrayBin.filepath
+    this._conf = conf;
+    this._binPath = systrayBin.filepath;
     this._process = child.spawn(this._binPath, [], {
-      windowsHide: true
-    })
+      windowsHide: true,
+    });
     this._rl = readline.createInterface({
       input: this._process.stdout as unknown as Readable,
-    })
-    conf.menu.items = conf.menu.items.map(updateCheckedInLinux)
-    this._rl.on('line', data => debug('onLine', data))
-    this.onReady(() => this.writeLine(JSON.stringify(conf.menu)))
+    });
+    conf.menu.items = conf.menu.items.map(updateCheckedInLinux);
+    this._rl.on('line', data => debug('onLine', data));
+    this.onReady(() => this.writeLine(JSON.stringify(conf.menu)));
   }
 
   /** Call this (& await it) before doing anything! This ensures the executable actually exists */
   static async install() {
-    await systrayBin.install(false)
+    await systrayBin.install(false);
   }
   /** Call this (& await it) before doing anything! This ensures the executable actually exists */
   async install() {
-    this._binPath = await getTrayBinPath()
+    this._binPath = await getTrayBinPath();
   }
 
   onReady(listener: (...empty: void[]) => void) {
     this._rl.on('line', (line: string) => {
-      let action: Event = JSON.parse(line)
+      let action: Event = JSON.parse(line);
       if (action.type === 'ready') {
-        listener()
-        debug('onReady', action)
+        listener();
+        debug('onReady', action);
       }
-    })
-    return this
+    });
+    return this;
   }
 
   onClick(listener: (action: ClickEvent) => void) {
     this._rl.on('line', (line: string) => {
-      let action: ClickEvent = JSON.parse(line)
+      let action: ClickEvent = JSON.parse(line);
       if (action.type === 'clicked') {
-        debug('onClick', action)
-        listener(action)
+        debug('onClick', action);
+        listener(action);
       }
-    })
-    return this
+    });
+    return this;
   }
 
   writeLine(line: string) {
     if (line) {
-      debug('writeLine', line + '\n', '=====')
-      this._process.stdin?.write(line.trim() + '\n')
+      debug('writeLine', line + '\n', '=====');
+      this._process.stdin?.write(line.trim() + '\n');
     }
-    return this
+    return this;
   }
 
   sendAction(action: Action) {
     switch (action.type) {
       case 'update-item':
-        action.item = updateCheckedInLinux(action.item)
-        break
+        action.item = updateCheckedInLinux(action.item);
+        break;
       case 'update-menu':
-        action.menu.items = action.menu.items.map(updateCheckedInLinux)
-        break
+        action.menu.items = action.menu.items.map(updateCheckedInLinux);
+        break;
       case 'update-menu-and-item':
-        action.menu.items = action.menu.items.map(updateCheckedInLinux)
-        action.item = updateCheckedInLinux(action.item)
-        break
+        action.menu.items = action.menu.items.map(updateCheckedInLinux);
+        action.item = updateCheckedInLinux(action.item);
+        break;
     }
-    debug('sendAction', action)
-    this.writeLine(JSON.stringify(action))
-    return this
+    debug('sendAction', action);
+    this.writeLine(JSON.stringify(action));
+    return this;
   }
   /**
    * Kill the systray process
@@ -214,28 +213,28 @@ export default class SysTray extends EventEmitter {
    */
   kill(exitNode = true) {
     if (exitNode) {
-      this.onExit(() => process.exit(0))
+      this.onExit(() => process.exit(0));
     }
-    this._rl.close()
-    this._process.kill()
+    this._rl.close();
+    this._process.kill();
   }
 
   onExit(listener: (code: number | null, signal: string | null) => void) {
-    this._process.on('exit', listener)
+    this._process.on('exit', listener);
   }
 
   onError(listener: (err: Error) => void) {
     this._process.on('error', err => {
-      debug('onError', err, 'binPath', this.binPath)
-      listener(err)
-    })
+      debug('onError', err, 'binPath', this.binPath);
+      listener(err);
+    });
   }
 
   get killed() {
-    return this._process.killed
+    return this._process.killed;
   }
 
   get binPath() {
-    return this._binPath
+    return this._binPath;
   }
 }

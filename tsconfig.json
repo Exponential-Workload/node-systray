@@ -11,14 +11,15 @@
       "ES2020",
       "ES2021",
       "es5",
-      "es6",
+      "es6"
     ],
     "target": "ES5",
-    "moduleResolution": "nodenext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "declaration": true,
     "sourceMap": true,
     "declarationMap": true,
-    "strict": true,
+    "strict": true
   },
   "include": ["./src/**/*"]
 }

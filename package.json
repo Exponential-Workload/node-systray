@@ -1,43 +1,54 @@
 {
   "name": "@3xpo/systray",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "A systray libray for nodejs with updated dependencies & dynamically downloaded binaries",
-  "main": "lib/index.js",
-  "typings": "lib/index.d.ts",
-  "types": "lib/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "gendoc": "typedoc src/index.ts",
-    "prepublish": "pnpm run build"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Exponential-Workload/node-systray.git"
-  },
   "keywords": [
     "systray",
     "tray",
     "gui"
   ],
-  "author": "zaaack & expo",
-  "license": "MIT",
+  "homepage": "https://github.com/Exponential-Workload/node-systray#readme",
   "bugs": {
     "url": "https://github.com/Exponential-Workload/node-systray/issues"
   },
-  "homepage": "https://github.com/Exponential-Workload/node-systray#readme",
-  "devDependencies": {
-    "@types/debug": "^4.1.8",
-    "@types/node": "^20.2.3",
-    "debug": "^4.3.4",
-    "ts-node": "^10.9.1",
-    "tslib": "^2.5.2",
-    "typedoc": "^0.24.7",
-    "typescript": "^5.0.4"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Exponential-Workload/node-systray.git"
+  },
+  "license": "MIT",
+  "author": "zaaack & expo",
+  "main": "lib/index.cjs",
+  "module": "lib/index.mjs",
+  "types": "lib/index.d.ts",
+  "typings": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.mjs",
+      "require": "./lib/index.cjs",
+      "default": "./lib/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "concurrently \"tsc --emitDeclarationOnly\" \"esbuild src/index.ts --outfile=lib/index.cjs --sourcemap --bundle --minify --packages=external --format=cjs\" \"esbuild src/index.ts --outfile=lib/index.mjs --sourcemap --bundle --minify --packages=external --format=esm\" && esbuild postbuild.ts --format=cjs --bundle --minify --packages=external | node",
+    "gendoc": "typedoc src/index.ts",
+    "prepublish": "pnpm run build"
   },
   "dependencies": {
     "systray-bin": "^1.0.1"
+  },
+  "devDependencies": {
+    "@3xpo/pkgmetatool": "^0.1.6",
+    "@types/debug": "^4.1.12",
+    "@types/node": "^20.11.30",
+    "debug": "^4.3.4",
+    "esbuild": "^0.20.2",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.6.2",
+    "typedoc": "^0.25.12",
+    "typescript": "^5.4.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
